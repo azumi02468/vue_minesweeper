@@ -1,15 +1,16 @@
 <template>
   <div class="minesweeper">
     <h1>{{ msg }}</h1>
-    横：<input type="number" step="1" min="2" name="yoko" id="yoko" v-model="area.yoko" />
-    縦：<input type="number" step="1" min="2" name="tate" id="tate" v-model="area.tate" />
-    爆弾：<input type="number" step="1" min="1" v-bind:max="getMaxBomb" name="bomb" id="bomb" v-model="area.bomb" />
+    横：<input type="number" step="1" min="2" name="yoko" id="yoko" v-model.number="area.yoko" />
+    縦：<input type="number" step="1" min="2" name="tate" id="tate" v-model.number="area.tate" />
+    爆弾：<input type="number" step="1" min="1" v-bind:max="getMaxBomb" name="bomb" id="bomb" v-model.number="area.bomb" />
     <button @click="bombShuffle">作成！</button>
 
     <div id="playground" v-if="isDisp">
       <table border="1">
         <tr v-for="(cols,y) in box" :key="y">
-          <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" v-on:click.right.prevent="toggleFlag(cell)">
+          <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" v-on:click.right.prevent="toggleFlag(cell)"
+           @touchstart="onTouchStart">
             <div v-if="cell.bombDispKbn === 1">✖︎</div>
             <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
             <div v-else-if="cell.bombDispKbn === 3">-</div>
@@ -26,10 +27,9 @@
 <script>
 // 爆弾配置
 let bombShuffle = function(){
-  if (this.area.bomb > this.getMaxBomb) {
-    alert("爆弾数は"+this.getMaxBomb+"までにしてください。");
-    return;
-  }
+  // 入力値チェック
+  if (!this.checkInput()) return;
+  
   // 初期化
   this.area.finish = 0;
   this.box.splice(-this.box.length);
@@ -82,6 +82,28 @@ let bombShuffle = function(){
   }
   console.log(this.box);
   this.isDisp = true;
+}
+
+// 入力チェック
+let checkInput = function(){
+  let checkFlg = true;
+  if (this.area.tate < 2) {
+    alert("縦は2以上の数値にしてください。");
+    checkFlg = false;
+  }
+  if (this.area.yoko < 2) {
+    alert("横は2以上の数値にしてください。");
+    checkFlg = false;
+  }
+  if (this.area.bomb <= 0) {
+    alert("爆弾は1以上の数値にしてください。");
+    checkFlg = false;
+  }
+  if (this.area.bomb > this.getMaxBomb) {
+    alert("爆弾数は"+this.getMaxBomb+"までにしてください。");
+    checkFlg = false;
+  }
+  return checkFlg;
 }
 
 // クリックした場所が爆弾かどうか判定
@@ -187,6 +209,19 @@ let checkNextCell = function(y, t){
   }
 }
 
+// タッチイベントを拾う(秒読スタート)
+let onTouchStart = function(e){
+  let touch_time = 0;
+  document.interval = setInterval(function(){
+    touch_time += 100;
+    if (touch_time == 1000) {
+      // ロングタップ(タップから約1秒)時の処理
+      this.toggleFlag();
+    }
+  }, 100)
+  e.preventDefault();
+}
+
 // 旗をたてる、下ろす
 let toggleFlag = function(bombFlg){
   if (bombFlg.bombDispKbn > 0){
@@ -218,12 +253,14 @@ export default {
     }
   },
   methods: {
+    checkInput: checkInput,
     bombShuffle: bombShuffle,
     isBomb: isBomb,
     dispAllResult: dispAllResult,
     checkNextCell: checkNextCell,
     toggleFlag: toggleFlag,
-    checkSuccess: checkSuccess
+    checkSuccess: checkSuccess,
+    onTouchStart: onTouchStart
   }
 }
 </script>
