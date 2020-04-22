@@ -9,8 +9,8 @@
     <div id="playground" v-if="isDisp">
       <table border="1">
         <tr v-for="(cols,y) in box" :key="y">
-          <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" v-on:click.right.prevent="toggleFlag(cell)"
-           @touchstart="onTouchStart">
+          <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" @click.right.prevent="toggleFlag(cell)"
+           @touchstart="onTouchStart(cell, $event)" @touchend="onTouchEnd(cell)">
             <div v-if="cell.bombDispKbn === 1">✖︎</div>
             <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
             <div v-else-if="cell.bombDispKbn === 3">-</div>
@@ -209,17 +209,45 @@ let checkNextCell = function(y, t){
   }
 }
 
+// タイマー
+let touch_time = 0;
+// タッチフラグ
+let touched = false;
+
 // タッチイベントを拾う(秒読スタート)
-let onTouchStart = function(e){
-  let touch_time = 0;
-  document.interval = setInterval(function(){
-    touch_time += 100;
-    if (touch_time == 1000) {
-      // ロングタップ(タップから約1秒)時の処理
-      this.toggleFlag();
+let onTouchStart = function(bombFlg, e){
+  let touchFlg = false;
+  if (e.type === "touchstart") {
+    touchFlg = true;
+    touched = true;
+  }
+
+  // イベント判定
+  // タッチ時
+  if (touchFlg) {
+    document.interval = setInterval(function(){
+      touch_time += 100;
+      if (touch_time == 1000) {
+        // ロングタップ(タップから約1秒)時の処理
+        this.toggleFlag(bombFlg);
+      }
+    }, 100);
+  // クリック時
+  } else {
+    this.isBomb(bombFlg);
+  }
+}
+
+// タッチイベントの終了
+let onTouchEnd = function(bombFlg){
+  if (touched) {
+    if (touch_time < 1000 ) {
+      // 短いタップでの処理
+      this.isBomb(bombFlg);
     }
-  }, 100)
-  e.preventDefault();
+  }
+  touched = false;
+  clearInterval(document.interval);
 }
 
 // 旗をたてる、下ろす
@@ -260,7 +288,8 @@ export default {
     checkNextCell: checkNextCell,
     toggleFlag: toggleFlag,
     checkSuccess: checkSuccess,
-    onTouchStart: onTouchStart
+    onTouchStart: onTouchStart,
+    onTouchEnd: onTouchEnd
   }
 }
 </script>
