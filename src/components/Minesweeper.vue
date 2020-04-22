@@ -10,7 +10,7 @@
       <table border="1">
         <tr v-for="(cols,y) in box" :key="y">
           <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" @click.right.prevent="toggleFlag(cell)"
-           @touchstart="onTouchStart(cell, $event)" @touchend="onTouchEnd(cell)">
+           @touchstart="onTouchStart(cell, $event)" @touchend.prevent="onTouchEnd(cell)">
             <div v-if="cell.bombDispKbn === 1">✖︎</div>
             <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
             <div v-else-if="cell.bombDispKbn === 3">-</div>
