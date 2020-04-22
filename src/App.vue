@@ -1,17 +1,16 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <Minesweeper msg="マインスイーパー"/>
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import Minesweeper from './components/Minesweeper.vue'
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    Minesweeper
   }
 }
 </script>
