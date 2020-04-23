@@ -1,32 +1,53 @@
 <template>
   <div class="minesweeper">
     <h1>{{ msg }}</h1>
-    横：<input type="number" step="1" min="2" name="yoko" id="yoko" v-model.number="area.yoko" />
-    縦：<input type="number" step="1" min="2" name="tate" id="tate" v-model.number="area.tate" />
+    横：<input type="number" step="1" min="2" v-bind:max="getMaxYoko" name="yoko" id="yoko" v-model.number="area.yoko" />
+    縦：<input type="number" step="1" min="2" v-bind:max="getMaxTate" name="tate" id="tate" v-model.number="area.tate" />
     爆弾：<input type="number" step="1" min="1" v-bind:max="getMaxBomb" name="bomb" id="bomb" v-model.number="area.bomb" />
     <button @click="bombShuffle">作成！</button>
-
     <div id="playground" v-if="isDisp">
-      <table border="1">
-        <tr v-for="(cols,y) in box" :key="y">
-          <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" @click.right.prevent="toggleFlag(cell)"
-           @touchstart="onTouchStart(cell, $event)" @touchend.prevent="onTouchEnd(cell)">
-            <div v-if="cell.bombDispKbn === 1">✖︎</div>
-            <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
-            <div v-else-if="cell.bombDispKbn === 3">-</div>
-            <div v-else-if="cell.flag">🚩</div>
-          </td>
-        </tr>
-      </table>
-      <div v-if="area.finish === 1">SUCCESS!</div>
-      <div v-if="area.finish === 2">GAME OVER</div>
+      <div>経過時間：{{area.gameTime}}秒</div>
+      <!-- スマートフォン用 -->
+      <div v-if="isSmartPhone">
+        <div>旗を立てる／降ろすには、<br />1秒以上ロングタップしてください。</div>
+        <table border="1">
+          <tr v-for="(cols,y) in box" :key="y">
+            <td v-for="(cell,t) in cols" :key="t" v-on:touchstart="touchstart(cell,$event)" v-on:touchend="touchend(cell,y,t)">
+              <div v-if="cell.bombDispKbn === 1">✖︎</div>
+              <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
+              <div v-else-if="cell.bombDispKbn === 3">-</div>
+              <div v-else-if="cell.flag">🚩</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- PC用 -->
+      <div v-else>
+        <div>旗を立てる／降ろすには、右クリックしてください。</div>
+        <table border="1">
+          <tr v-for="(cols,y) in box" :key="y">
+            <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" @click.right.prevent="toggleFlag(cell)">
+              <div v-if="cell.bombDispKbn === 1">✖︎</div>
+              <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
+              <div v-else-if="cell.bombDispKbn === 3">-</div>
+              <div v-else-if="cell.flag">🚩</div>
+            </td>
+          </tr>
+        </table>
+      </div>
     </div>
+    <div v-if="area.finish === 1">SUCCESS!</div>
+    <div v-if="area.finish === 2">GAME OVER</div>
   </div>
 </template>
-
 <script>
 // 爆弾配置
 let bombShuffle = function(){
+  // ゲーム経過時間をクリア
+  this.area.gameTime = 0;
+  this.resetGameTime();
+
   // 入力値チェック
   if (!this.checkInput()) return;
   
@@ -87,27 +108,40 @@ let bombShuffle = function(){
 // 入力チェック
 let checkInput = function(){
   let checkFlg = true;
-  if (this.area.tate < 2) {
-    alert("縦は2以上の数値にしてください。");
+  let errMsg = "";
+  const LF = "\n";
+
+  if (this.area.tate < 2 || this.area.tate > this.getMaxTate) {
+    errMsg = "縦は2以上"+this.getMaxTate+"以下の数値にしてください。";
     checkFlg = false;
   }
-  if (this.area.yoko < 2) {
-    alert("横は2以上の数値にしてください。");
+  if (this.area.yoko < 2 || this.area.yoko > this.getMaxYoko) {
+    errMsg += LF + "横は2以上"+this.getMaxYoko+"以下の数値にしてください。";
     checkFlg = false;
   }
   if (this.area.bomb <= 0) {
-    alert("爆弾は1以上の数値にしてください。");
+    errMsg += LF + "爆弾は1以上の数値にしてください。";
     checkFlg = false;
   }
+  if(!checkFlg){
+    alert(errMsg);
+    return checkFlg;
+  }
+
   if (this.area.bomb > this.getMaxBomb) {
-    alert("爆弾数は"+this.getMaxBomb+"までにしてください。");
+    errMsg += LF + "爆弾数は"+this.getMaxBomb+"までにしてください。";
     checkFlg = false;
+    alert(errMsg);
   }
   return checkFlg;
 }
 
 // クリックした場所が爆弾かどうか判定
 let isBomb = function(bombFlg,y,t){
+  // タイマー起動
+  if (!this.gameTimer){
+    this.measureGameTime();
+  }
   if (bombFlg.bombDispKbn > 0 || bombFlg.flag){
     return;
   }
@@ -172,12 +206,12 @@ let dispAllResult = function(){
       }
     }
   }
+  // 全て表示したらゲーム経過時間を止める
+  this.resetGameTime();
 }
 
 // 隣のマスチェック
-// 上下左右の隣を再帰的に確認していく
-// y:yoko 0 <= y <= this.area.yoko
-// t:tate 0 <= t <= this.area.tate
+// 左上・上・右上・左・右・左下・下・右下の順に再帰的にチェックする
 let checkNextCell = function(y, t){
   // 爆弾の隣のマスにフラグを立てる
   for (let i=y-1;i<=y+1;i++){
@@ -209,53 +243,62 @@ let checkNextCell = function(y, t){
   }
 }
 
-// タイマー
-let touch_time = 0;
-// タッチフラグ
-let touched = false;
-
-// タッチイベントを拾う(秒読スタート)
-let onTouchStart = function(bombFlg, e){
-  let touchFlg = false;
-  if (e.type === "touchstart") {
-    touchFlg = true;
-    touched = true;
-  }
-
-  // イベント判定
-  // タッチ時
-  if (touchFlg) {
-    document.interval = setInterval(function(){
-      touch_time += 100;
-      if (touch_time == 1000) {
-        // ロングタップ(タップから約1秒)時の処理
-        this.toggleFlag(bombFlg);
-      }
-    }, 100);
-  // クリック時
-  } else {
-    this.isBomb(bombFlg);
-  }
-}
-
-// タッチイベントの終了
-let onTouchEnd = function(bombFlg){
-  if (touched) {
-    if (touch_time < 1000 ) {
-      // 短いタップでの処理
-      this.isBomb(bombFlg);
-    }
-  }
-  touched = false;
-  clearInterval(document.interval);
-}
-
 // 旗をたてる、下ろす
 let toggleFlag = function(bombFlg){
   if (bombFlg.bombDispKbn > 0){
     return;
   }
   bombFlg.flag = !bombFlg.flag;
+}
+
+// 長タップ時の挙動
+let onlongtouch = function(bombFlg) {
+  this.timer = null;
+  this.toggleFlag(bombFlg);
+};
+
+// タップイベント発生時にタイマーを仕掛ける
+let touchstart = function(bombFlg,e) {
+  let self = this;
+  e.preventDefault();
+  if (!this.timer) {
+    this.timer = setTimeout(function(){self.onlongtouch(bombFlg)}, 1000);
+  }
+}
+
+// タップイベントが長押しかどうか判定
+let touchend = function(bombFlg,y,t) {
+  //stops short touches from firing the event
+  this.isBomb(bombFlg,y,t);
+  if (this.timer) {
+    clearTimeout(this.timer);
+    this.timer = null;
+  }
+}
+
+// デバイス判定
+let isSmartPhone = function(){
+  let ua = navigator.userAgent;
+  console.log(ua);
+  if(ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0 || ua.indexOf('Android') > 0 && ua.indexOf('Mobile') > 0){
+     return true;
+  }else{
+      return false;
+  }
+}
+
+// ゲーム時間測定
+let measureGameTime = function(){
+  let self = this;
+  this.gameTimer = setInterval(function(){
+    self.area.gameTime += 1;
+  },1000);
+}
+
+// ゲーム経過時間を止める
+let resetGameTime = function(){
+  clearInterval(this.gameTimer);
+  this.gameTimer = null;
 }
 
 export default {
@@ -265,7 +308,22 @@ export default {
   },
   computed: {
     getMaxBomb: function(){
-      return this.area.tate * this.area.yoko
+      return (this.area.tate * this.area.yoko) - 1
+    },
+    isSmartPhone: isSmartPhone,
+    getMaxTate: function(){
+      if (this.isSmartPhone) {
+        return this.limit.SP.tate
+      } else {
+        return this.limit.PC.tate
+      }
+    },
+    getMaxYoko: function(){
+      if (this.isSmartPhone) {
+        return this.limit.SP.yoko
+      } else {
+        return this.limit.PC.yoko
+      }
     }
   },
   data() {
@@ -274,7 +332,18 @@ export default {
         tate: 9,
         yoko: 9,
         bomb: 10,
-        finish: 0
+        finish: 0,
+        gameTime: 0
+      },
+      limit: {
+        SP: {
+          tate: 15,
+          yoko: 15
+        },
+        PC: {
+          tate: 50,
+          yoko: 50
+        }
       },
       isDisp: false,
       box: [] //[[{bomb:0,bombNext:1,bombDispKbn:0},{bomb:1,bombNext:2,bombDispKbn:1}...]]
@@ -288,8 +357,11 @@ export default {
     checkNextCell: checkNextCell,
     toggleFlag: toggleFlag,
     checkSuccess: checkSuccess,
-    onTouchStart: onTouchStart,
-    onTouchEnd: onTouchEnd
+    touchstart: touchstart,
+    touchend: touchend,
+    onlongtouch: onlongtouch,
+    measureGameTime: measureGameTime,
+    resetGameTime: resetGameTime  
   }
 }
 </script>
