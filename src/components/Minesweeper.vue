@@ -9,10 +9,13 @@
       <div>経過時間：{{area.gameTime}}秒</div>
       <!-- スマートフォン用 -->
       <div v-if="isSmartPhone">
-        <div>旗を立てる／降ろすには、<br />1秒以上ロングタップしてください。</div>
+        フラッグモード：<input type="checkbox" v-model="area.flagMode" />
+        <div class="explanation">旗を立てる／降ろすには、<br />以下のいずれかで実施してください。<br />
+        ・約1秒以上ロングタップする。<br />
+        ・フラッグモードにチェックを入れてタップする。</div>
         <table border="1">
           <tr v-for="(cols,y) in box" :key="y">
-            <td v-for="(cell,t) in cols" :key="t" v-on:touchstart="touchstart(cell,$event)" v-on:touchend="touchend(cell,y,t)">
+            <td v-for="(cell,t) in cols" :key="t" v-on:touchstart="touchstart(cell,$event)" v-on:touchend="touchend(cell,y,t,$event)">
               <div v-if="cell.bombDispKbn === 1">✖︎</div>
               <div v-else-if="cell.bombDispKbn === 2">{{cell.bombNext}}</div>
               <div v-else-if="cell.bombDispKbn === 3">-</div>
@@ -24,7 +27,7 @@
 
       <!-- PC用 -->
       <div v-else>
-        <div>旗を立てる／降ろすには、右クリックしてください。</div>
+        <div class="explanation" style="width:500px;">旗を立てる／降ろすには、右クリックしてください。</div>
         <table border="1">
           <tr v-for="(cols,y) in box" :key="y">
             <td v-for="(cell,t) in cols" :key="t" @click="isBomb(cell,y,t)" @click.right.prevent="toggleFlag(cell)">
@@ -139,7 +142,7 @@ let checkInput = function(){
 // クリックした場所が爆弾かどうか判定
 let isBomb = function(bombFlg,y,t){
   // タイマー起動
-  if (!this.gameTimer){
+  if (!this.area.finish && !this.gameTimer){
     this.measureGameTime();
   }
   if (bombFlg.bombDispKbn > 0 || bombFlg.flag){
@@ -259,20 +262,30 @@ let onlongtouch = function(bombFlg) {
 
 // タップイベント発生時にタイマーを仕掛ける
 let touchstart = function(bombFlg,e) {
-  let self = this;
-  e.preventDefault();
-  if (!this.timer) {
-    this.timer = setTimeout(function(){self.onlongtouch(bombFlg)}, 1000);
+  // フラッグモードの場合
+  if (this.area.flagMode) {
+    // 何もしない
+  } else {
+    let self = this;
+    e.preventDefault();
+    if (!this.timer) {
+      this.timer = setTimeout(function(){self.onlongtouch(bombFlg)}, 700);
+    }
   }
 }
 
 // タップイベントが長押しかどうか判定
 let touchend = function(bombFlg,y,t) {
-  //stops short touches from firing the event
-  this.isBomb(bombFlg,y,t);
-  if (this.timer) {
-    clearTimeout(this.timer);
-    this.timer = null;
+  // フラッグモードの場合
+  if (this.area.flagMode) {
+    this.toggleFlag(bombFlg);
+  } else {
+    //stops short touches from firing the event
+    this.isBomb(bombFlg,y,t);
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
   }
 }
 
@@ -332,6 +345,7 @@ export default {
         tate: 9,
         yoko: 9,
         bomb: 10,
+        flagMode: false,
         finish: 0,
         gameTime: 0
       },
@@ -361,7 +375,7 @@ export default {
     touchend: touchend,
     onlongtouch: onlongtouch,
     measureGameTime: measureGameTime,
-    resetGameTime: resetGameTime  
+    resetGameTime: resetGameTime
   }
 }
 </script>
@@ -391,5 +405,11 @@ table {
 table td {
     width: 30px;
     height: 30px;
+}
+
+.explanation {
+  border: 1px solid #333333;
+  padding: 10px;
+  margin: 0 auto 10px;
 }
 </style>
