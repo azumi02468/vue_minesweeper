@@ -12,7 +12,7 @@
         フラッグモード：<input type="checkbox" v-model="area.flagMode" />
         <div class="explanation">旗を立てる／降ろすには、<br />以下のいずれかで実施してください。<br />
         ・約1秒以上ロングタップする。<br />
-        ・フラッグモードにチェックを入れてタップする。</div>
+        ・フラッグモードをチェックしてタップする。</div>
         <table border="1">
           <tr v-for="(cols,y) in box" :key="y">
             <td v-for="(cell,t) in cols" :key="t" v-on:touchstart="touchstart(cell,$event)" v-on:touchend="touchend(cell,y,t,$event)">
@@ -40,8 +40,15 @@
         </table>
       </div>
     </div>
+    <!-- 結果 -->
     <div v-if="area.finish === 1">SUCCESS!</div>
     <div v-if="area.finish === 2">GAME OVER</div>
+    <br />
+    <!-- 自分ランキング -->
+    <div v-if="isDisp" id="ranking">
+      <span>過去の最高ランキング<br />(横、縦、爆弾数は現在設定したものになります。)</span>
+      <div>{{dispBestTime}}</div>
+    </div>
   </div>
 </template>
 <script>
@@ -104,7 +111,7 @@ let bombShuffle = function(){
     // 爆弾セット数を1つ減らす
     bombCount--;
   }
-  console.log(this.box);
+  //console.log(this.box);
   this.isDisp = true;
 }
 
@@ -177,6 +184,7 @@ let checkSuccess = function(){
   if (successCount === this.area.bomb){
     this.area.finish = 1;
     this.dispAllResult();
+    this.saveBestTime();
     alert("おめでとう！クリアしました！");
   }
 }
@@ -289,17 +297,6 @@ let touchend = function(bombFlg,y,t) {
   }
 }
 
-// デバイス判定
-let isSmartPhone = function(){
-  let ua = navigator.userAgent;
-  console.log(ua);
-  if(ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0 || ua.indexOf('Android') > 0 && ua.indexOf('Mobile') > 0){
-     return true;
-  }else{
-      return false;
-  }
-}
-
 // ゲーム時間測定
 let measureGameTime = function(){
   let self = this;
@@ -314,6 +311,53 @@ let resetGameTime = function(){
   this.gameTimer = null;
 }
 
+// 最高記録を取得する
+let loadBestTime = function(){
+  let self = this;
+  let tmpBestTimeObj = this.bestTime.find(self.checkOption);
+  if (tmpBestTimeObj && Object.prototype.hasOwnProperty.call(tmpBestTimeObj, 'time')) {
+    return tmpBestTimeObj.time;
+  }
+  return null;
+}
+
+// 最高記録を保存する
+let saveBestTime = function(){
+  let self = this;
+  if(!this.loadBestTime() || this.loadBestTime() > this.area.gameTime){
+    let targetIndex = this.bestTime.findIndex(self.checkOption);
+    // 新規登録
+    if (targetIndex === -1) {
+      this.bestTime.push({
+        tate: this.area.tate,
+        yoko: this.area.yoko,
+        bomb: this.area.bomb,
+        time: this.area.gameTime
+      });
+    // 更新
+    } else {
+      this.bestTime.splice(targetIndex,1,{
+        tate: this.area.tate,
+        yoko: this.area.yoko,
+        bomb: this.area.bomb,
+        time: this.area.gameTime
+      });
+    }
+    localStorage.setItem('bestTime', JSON.stringify(this.bestTime));
+  }
+}
+
+// 最高記録の値かどうかを確認フィルター
+let checkOption = function(item){
+  if (!item) {
+    return false;
+  }
+  if (item.tate === this.area.tate && item.yoko === this.area.yoko && item.bomb === this.area.bomb){
+    return true;
+  }
+  return false;
+}
+
 export default {
   name: 'Minesweeper',
   props: {
@@ -323,7 +367,14 @@ export default {
     getMaxBomb: function(){
       return (this.area.tate * this.area.yoko) - 1
     },
-    isSmartPhone: isSmartPhone,
+    isSmartPhone: function(){
+      let ua = navigator.userAgent;
+      if(ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0 || ua.indexOf('Android') > 0 && ua.indexOf('Mobile') > 0){
+        return true;
+      }else{
+        return false;
+      }
+    },
     getMaxTate: function(){
       if (this.isSmartPhone) {
         return this.limit.SP.tate
@@ -337,6 +388,13 @@ export default {
       } else {
         return this.limit.PC.yoko
       }
+    },
+    dispBestTime: function(){
+      let tmpBestTime = this.loadBestTime();
+      if (tmpBestTime !== null && tmpBestTime >= 0) {
+        return tmpBestTime + '秒';
+      }
+      return '記録なし';
     }
   },
   data() {
@@ -360,6 +418,7 @@ export default {
         }
       },
       isDisp: false,
+      bestTime: [],
       box: [] //[[{bomb:0,bombNext:1,bombDispKbn:0},{bomb:1,bombNext:2,bombDispKbn:1}...]]
     }
   },
@@ -375,7 +434,19 @@ export default {
     touchend: touchend,
     onlongtouch: onlongtouch,
     measureGameTime: measureGameTime,
-    resetGameTime: resetGameTime
+    resetGameTime: resetGameTime,
+    loadBestTime: loadBestTime,
+    saveBestTime: saveBestTime,
+    checkOption: checkOption
+  },
+  created: function(){
+    if (localStorage.getItem('bestTime')){
+      try {
+        this.bestTime = JSON.parse(localStorage.getItem('bestTime'));
+      } catch(e) {
+        alert('システム管理者に問い合わせてください。');
+      }
+    }
   }
 }
 </script>
@@ -411,5 +482,10 @@ table td {
   border: 1px solid #333333;
   padding: 10px;
   margin: 0 auto 10px;
+}
+
+#ranking {
+  color: #FA6964;
+  font-weight: bold;
 }
 </style>
